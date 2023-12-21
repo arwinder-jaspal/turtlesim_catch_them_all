@@ -4,8 +4,11 @@
   <name>turtlesim_catch_them_all</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="arwinderpal.jaspal@kabam.ai">arwinder</maintainer>
+  <maintainer email="arwinderjaspal@gmail.com">arwinder</maintainer>
   <license>TODO: License declaration</license>
+
+  <depend>rclpy</depend>
+  <depend>turtlesim</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
