@@ -6,8 +6,9 @@ import random
 import math
 from rclpy.node import Node
 
-from turtlesim.srv import Spawn
+from turtlesim.srv import Spawn, Kill
 from my_robot_interfaces.msg import Turtle, TurtleArray
+from my_robot_interfaces.srv import CatchTurtle
 
 
 class TurtleSpawnerNode(Node):
@@ -18,7 +19,34 @@ class TurtleSpawnerNode(Node):
         self.alive_turtles_ = []
         self.alive_turtles_publisher_ = self.create_publisher(
             TurtleArray, "alive_turtles", 10)
-        self.spwan_turtle_timer = self.create_timer(2.0, self.spawn_new_turtle)
+        self.spawn_turtle_timer = self.create_timer(2.0, self.spawn_new_turtle)
+        self.catch_turtle_server = self.create_service(
+            CatchTurtle, "catch_turtle", self.catch_turtle_callback)
+
+    def catch_turtle_callback(self, request, response):
+        kill_turtle_client = self.create_client(Kill, "kill")
+        while not kill_turtle_client.wait_for_service(1.0):
+            self.get_logger().warn("Waiting for kill service...")
+
+        kill_request = Kill.Request()
+
+        kill_request.name = request.name
+        future = kill_turtle_client.call_async(kill_request)
+
+        future.add_done_callback(
+            partial(self.killed_turtle_done_cb, turtle_name=request.name))
+
+        response.success = True
+        return response
+
+    def killed_turtle_done_cb(self, future, turtle_name):
+        try:
+            future.result()
+            self.alive_turtles_.pop(0)
+            self.get_logger().info("Killed " + turtle_name)
+            self.publish_alive_turtles()
+        except Exception as e:
+            self.get_logger().error("Failed to call kill service..")
 
     def publish_alive_turtles(self):
         msg = TurtleArray()
@@ -47,9 +75,9 @@ class TurtleSpawnerNode(Node):
 
         future = client.call_async(request)
         future.add_done_callback(partial(
-            self.done_spawn_callback, turtle_name=turtle_name, x=x, y=y, theta=theta))
+            self.done_spawn_callback, x=x, y=y, theta=theta))
 
-    def done_spawn_callback(self, future, turtle_name, x, y, theta):
+    def done_spawn_callback(self, future, x, y, theta):
         try:
             response = future.result()
             if response.name is not None:
