@@ -19,7 +19,7 @@ class TurtleSpawnerNode(Node):
         self.alive_turtles_ = []
         self.alive_turtles_publisher_ = self.create_publisher(
             TurtleArray, "alive_turtles", 10)
-        self.spawn_turtle_timer = self.create_timer(2.0, self.spawn_new_turtle)
+        self.spawn_turtle_timer = self.create_timer(1.0, self.spawn_new_turtle)
         self.catch_turtle_server = self.create_service(
             CatchTurtle, "catch_turtle", self.catch_turtle_callback)
 
@@ -42,9 +42,11 @@ class TurtleSpawnerNode(Node):
     def killed_turtle_done_cb(self, future, turtle_name):
         try:
             future.result()
-            self.alive_turtles_.pop(0)
-            self.get_logger().info("Killed " + turtle_name)
-            self.publish_alive_turtles()
+            for (i, turtle) in enumerate(self.alive_turtles_):
+                if turtle.name == turtle_name:
+                    del self.alive_turtles_[i]
+                    self.publish_alive_turtles()
+                    break
         except Exception as e:
             self.get_logger().error("Failed to call kill service..")
 

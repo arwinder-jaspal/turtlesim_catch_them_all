@@ -15,6 +15,7 @@ class TurtleControllerNode(Node):
         super().__init__("turtle_controller")
         self.pose_ = Pose()
         self.turtles_to_catch_ = None
+        self.catch_nearest_turtle = True
         self.goal_pose_threshold = 0.5
         self.linear_vel_p_gain = 2.0
         self.angular_vel_p_gain = 6.0
@@ -32,7 +33,21 @@ class TurtleControllerNode(Node):
 
     def alive_turtles_cb(self, msg):
         if len(msg.turtles):
-            self.turtles_to_catch_ = msg.turtles[0]
+            if self.catch_nearest_turtle:
+                closest_turtle_ = None
+                closest_turtle_distance_ = None
+                for turtle in msg.turtles:
+                    dist_x = turtle.x - self.pose_.x
+                    dist_y = turtle.y - self.pose_.y
+                    distance = math.sqrt(
+                        math.pow(dist_x, 2.0) + math.pow(dist_y, 2.0))
+                    if closest_turtle_ == None or distance < closest_turtle_distance_:
+                        closest_turtle_ = turtle
+                        closest_turtle_distance_ = distance
+                self.turtles_to_catch_ = closest_turtle_
+
+            else:
+                self.turtles_to_catch_ = msg.turtles[0]
 
     def control_loop(self):
         # if current turtle pose is not none, do not send any cmd_vel
