@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import rclpy
 import math
+from functools import partial
 from rclpy.node import Node
 
 from turtlesim.msg import Pose
 from geometry_msgs.msg import Twist
 from my_robot_interfaces.msg import Turtle, TurtleArray
+from my_robot_interfaces.srv import CatchTurtle
 
 
 class TurtleControllerNode(Node):
@@ -25,14 +27,12 @@ class TurtleControllerNode(Node):
             TurtleArray, "alive_turtles", self.alive_turtles_cb, 10)
         self.control_loop_timer_ = self.create_timer(0.01, self.control_loop)
 
-
     def turtle_pose_cb(self, msg):
         self.pose_ = msg
-    
+
     def alive_turtles_cb(self, msg):
         if len(msg.turtles):
             self.turtles_to_catch_ = msg.turtles[0]
-        
 
     def control_loop(self):
         # if current turtle pose is not none, do not send any cmd_vel
@@ -57,8 +57,32 @@ class TurtleControllerNode(Node):
         else:
             cmd_vel_msg.linear.x = 0.0
             cmd_vel_msg.angular.z = 0.0
+            self.call_catch_turtle_server(self.turtles_to_catch_.name)
+            self.turtles_to_catch_ = None
 
         self.cmd_vel_publisher.publish(cmd_vel_msg)
+
+    def call_catch_turtle_server(self, turtle_name):
+        client = self.create_client(CatchTurtle, "catch_turtle")
+        while not client.wait_for_service(1.0):
+            self.get_logger().warn("Waiting for /catch_turtle service..")
+
+        request = CatchTurtle.Request()
+        request.name = turtle_name
+
+        future = client.call_async(request)
+        future.add_done_callback(partial(
+            self.catch_turtle_done_cb, turtle_name=turtle_name))
+
+    def catch_turtle_done_cb(self, future, turtle_name):
+
+        try:
+            response = future.result()
+            if not response.success:
+                self.get_logger().info("Failed to catch " + turtle_name)
+
+        except Exception as e:
+            self.get_logger().error("Failed to call catch_turtle service: %r" % (e,))
 
 
 def main(args=None):
